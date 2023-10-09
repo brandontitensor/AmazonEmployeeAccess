@@ -56,9 +56,34 @@ prepped_recipe <- prep(my_recipe, verbose = T)
 bake_1 <- bake(prepped_recipe, new_data = NULL)
 
 
+#######################
+##LOGISTIC REGRESSION##
+#######################
 
+my_data$ACTION <- as.factor(my_data$ACTION)
 
+logistic_mod <- logistic_reg() %>% 
+  set_engine("glm")
 
+logistic_workflow <- workflow() %>%
+add_recipe(my_recipe) %>%
+add_model(logistic_mod) %>%
+fit(data = my_data)
+
+extract_fit_engine(logistic_workflow) %>% #Extracts model details from workflow
+  summary()
+
+logistic_predictions <- predict(logistic_workflow,
+                              new_data=test_data,
+                              type= "prob")
+logistic_predictions <- cbind(test_data$id,logistic_predictions$.pred_1)
+
+colnames(logistic_predictions) <- c("id","ACTION")
+summary(logistic_predictions)
+
+logistic_predictions <- as.data.frame(logistic_predictions)
+
+vroom_write(logistic_predictions,"logistic_predictions.csv",',')
 
 
 
