@@ -17,6 +17,7 @@ conflicted::conflicts_prefer(yardstick::rmse)
 library(rpart)
 library(stacks) #For stacking
 library(ggmosaic)
+library(embed)
 
 
 ####################
@@ -32,6 +33,7 @@ registerDoParallel(cores = all_cores)
 
 my_data <- vroom("train.csv")
 test_data <- vroom("test.csv")
+my_data$ACTION <- as.factor(my_data$ACTION)
 
 #######
 ##EDA##
@@ -49,8 +51,9 @@ plot_1 <- ggplot(data=my_data) +
 
 my_recipe <- recipe(ACTION~., data=my_data) %>%
 step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors5
-  step_other(all_nominal_predictors(), threshold = .01) %>% # combines categorical values that occur <5% into an "other" value6
-  step_dummy(all_nominal_predictors()) 
+  step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value6
+  #step_dummy(all_nominal_predictors()) %>% 
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION))
 
 prepped_recipe <- prep(my_recipe, verbose = T)
 bake_1 <- bake(prepped_recipe, new_data = NULL)
@@ -84,6 +87,52 @@ summary(logistic_predictions)
 logistic_predictions <- as.data.frame(logistic_predictions)
 
 vroom_write(logistic_predictions,"logistic_predictions.csv",',')
+
+#######################
+##PENALIZED LOGISTIC##
+######################
+
+plog_mod <- logistic_reg(mixture = tune(),
+                         penalty = tune()) %>% 
+  set_engine("glmnet")
+
+plog_workflow <- workflow() %>%
+  add_recipe(my_recipe) %>%
+  add_model(plog_mod)
+
+tuning_grid <- grid_regular(penalty(),
+                           mixture(),
+                           levels = 5) ## L^2 total tuning possibilities13
+
+## Split data for CV
+folds <- vfold_cv(my_data, v = 3, repeats=1)
+
+
+CV_results <- plog_workflow %>%
+tune_grid(resamples=folds,
+          grid=tuning_grid,
+          metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
+                             precision, accuracy)) 
+bestTune <- CV_results %>%
+select_best("roc_auc")
+
+final_plog_workflow <-
+plog_workflow %>%
+finalize_workflow(bestTune) %>%
+fit(data=my_data)
+
+## Predict
+plog_predictions <- final_plog_workflow %>%
+predict(new_data = test_data, type="prob")
+
+plog_predictions <- cbind(test_data$id,plog_predictions$.pred_1)
+
+colnames(plog_predictions) <- c("id","ACTION")
+
+
+plog_predictions <- as.data.frame(plog_predictions)
+
+vroom_write(plog_predictions,"plog_predictions.csv",',')
 
 
 
