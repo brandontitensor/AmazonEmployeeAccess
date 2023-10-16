@@ -4,19 +4,31 @@
 
 library(tidymodels) #For the recipes
 library(tidyverse) #Given for EDA
+install.packages("poissonreg")
 library(poissonreg) #For Poisson Regression
+install.packages("vroom")
 library(vroom) #For reading in data
+install.packages("DataExplorer")
 library(DataExplorer)
+install.packages("glmnet")
 library(glmnet)
+install.packages("mltools")
 library(mltools)
+install.packages("randomForest")
 library(randomForest)
+install.packages("doParallel")
 library(doParallel)
+install.packages("xgboost")
 library(xgboost)
 tidymodels_prefer()
 conflicted::conflicts_prefer(yardstick::rmse)
+install.packages("rparts")
 library(rpart)
+install.packages("stacks")
 library(stacks) #For stacking
+install.packages("ggmosaic")
 library(ggmosaic)
+install.packages("embed")
 library(embed)
 
 
@@ -24,8 +36,11 @@ library(embed)
 ##WORK IN PARALLEL##
 ####################
 
-all_cores <- parallel::detectCores(logical = FALSE)
-registerDoParallel(cores = all_cores)
+#all_cores <- parallel::detectCores(logical = FALSE)
+#num_cores <- makePSOCKcluster(NUMBER OF CORES)
+#registerDoParallel(cores = all_cores)
+
+#stopCluster(num_cores)
 
 ########
 ##DATA##
