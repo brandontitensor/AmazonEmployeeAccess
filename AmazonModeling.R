@@ -20,9 +20,9 @@ library(embed)
 ##WORK IN PARALLEL##
 ####################
 
-#all_cores <- parallel::detectCores(logical = FALSE)
+all_cores <- parallel::detectCores(logical = FALSE)
 #num_cores <- makePSOCKcluster(NUMBER OF CORES)
-#registerDoParallel(cores = all_cores)
+registerDoParallel(cores = all_cores)
 
 #stopCluster(num_cores)
 
@@ -165,17 +165,18 @@ final_rf_wf <- RF_workflow %>%
   fit(data = my_data)
 
 
-bike_predictions_RF<- final_rf_wf %>% 
-  predict(new_data = test_data)
+RF_predictions <- final_rf_wf %>% 
+  predict(new_data = test_data, type="prob")
 
-bike_predictions_RF[bike_predictions_RF < 0] <- 0
-bike_predictions_RF <- cbind(test$datetime,bike_predictions_RF) #Adds back in the dattime variable for submission
-bike_predictions_RF <- bike_predictions_RF %>% mutate(.pred=exp(.pred))
-colnames(bike_predictions_RF) <- c("datetime","count") #Changes the labels for submission
-bike_predictions_RF$datetime <- as.character(format(bike_predictions_RF$datetime)) 
 
-vroom_write(bike_predictions_RF,"bike_predictions_RF.csv",',')
+RF_predictions <- cbind(test_data$id,RF_predictions$.pred_1)
 
+colnames(RF_predictions) <- c("id","ACTION")
+
+
+RF_predictions <- as.data.frame(RF_predictions)
+
+vroom_write(RF_predictions,"RF_predictions.csv",',')
 
 
 
