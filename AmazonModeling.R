@@ -38,11 +38,11 @@ my_data$ACTION <- as.factor(my_data$ACTION)
 ##EDA##
 #######
 
-DataExplorer::plot_histogram(my_data)
-GGally::ggpairs(my_data)
+#DataExplorer::plot_histogram(my_data)
+#GGally::ggpairs(my_data)
 
-plot_1 <- ggplot(data=my_data) +
-  geom_mosaic(aes(x=product(RESOURCE), fill = ACTION))
+#plot_1 <- ggplot(data=my_data) +
+#  geom_mosaic(aes(x=product(RESOURCE), fill = ACTION))
 
 ##########
 ##RECIPE##
