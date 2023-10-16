@@ -2,33 +2,18 @@
 ##LIBRARIES##
 #############
 
-library(tidymodels) #For the recipes
-library(tidyverse) #Given for EDA
-install.packages("poissonreg")
-library(poissonreg) #For Poisson Regression
-install.packages("vroom")
-library(vroom) #For reading in data
-install.packages("DataExplorer")
-library(DataExplorer)
-install.packages("glmnet")
+library(tidymodels) 
+library(tidyverse)
+library(vroom) 
 library(glmnet)
-install.packages("mltools")
 library(mltools)
-install.packages("randomForest")
 library(randomForest)
-install.packages("doParallel")
 library(doParallel)
-install.packages("xgboost")
 library(xgboost)
 tidymodels_prefer()
 conflicted::conflicts_prefer(yardstick::rmse)
-install.packages("rparts")
 library(rpart)
-install.packages("stacks")
-library(stacks) #For stacking
-install.packages("ggmosaic")
-library(ggmosaic)
-install.packages("embed")
+library(stacks)
 library(embed)
 
 
@@ -148,6 +133,50 @@ colnames(plog_predictions) <- c("id","ACTION")
 plog_predictions <- as.data.frame(plog_predictions)
 
 vroom_write(plog_predictions,"plog_predictions.csv",',')
+
+#################################
+##RANDOM FOREST CLASSIFICATIONS##
+#################################
+
+RF_model <- rand_forest(mode = "classification",
+                        mtry = tune(),
+                        trees = 500,
+                        min_n = tune()) %>% #Applies Linear Model
+  set_engine("ranger")
+
+RF_workflow <- workflow() %>% #Creates a workflow
+  add_recipe(my_recipe) %>% #Adds in my recipe
+  add_model(RF_model) 
+
+tuning_grid_rf <- grid_regular(mtry(range = c(1,10)),
+                               min_n(),
+                               levels = 5)
+folds_rf <- vfold_cv(my_data, v = 10, repeats=1)
+
+CV_results_rf <- RF_workflow %>%
+  tune_grid(resamples=folds_rf,
+            grid=tuning_grid_rf,
+            metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
+                               precision, accuracy))
+bestTune_rf <- CV_results_rf %>%
+  select_best("roc_auc")
+
+final_rf_wf <- RF_workflow %>% 
+  finalize_workflow(bestTune_rf) %>% 
+  fit(data = my_data)
+
+
+bike_predictions_RF<- final_rf_wf %>% 
+  predict(new_data = test_data)
+
+bike_predictions_RF[bike_predictions_RF < 0] <- 0
+bike_predictions_RF <- cbind(test$datetime,bike_predictions_RF) #Adds back in the dattime variable for submission
+bike_predictions_RF <- bike_predictions_RF %>% mutate(.pred=exp(.pred))
+colnames(bike_predictions_RF) <- c("datetime","count") #Changes the labels for submission
+bike_predictions_RF$datetime <- as.character(format(bike_predictions_RF$datetime)) 
+
+vroom_write(bike_predictions_RF,"bike_predictions_RF.csv",',')
+
 
 
 
