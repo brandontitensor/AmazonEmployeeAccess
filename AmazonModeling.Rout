@@ -1,0 +1,272 @@
+
+R version 4.3.1 (2023-06-16) -- "Beagle Scouts"
+Copyright (C) 2023 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> #############
+> ##LIBRARIES##
+> #############
+> 
+> library(tidymodels) 
+── Attaching packages ────────────────────────────────────── tidymodels 1.1.1 ──
+✔ broom        1.0.5     ✔ recipes      1.0.8
+✔ dials        1.2.0     ✔ rsample      1.2.0
+✔ dplyr        1.1.3     ✔ tibble       3.2.1
+✔ ggplot2      3.4.3     ✔ tidyr        1.3.0
+✔ infer        1.0.5     ✔ tune         1.1.2
+✔ modeldata    1.2.0     ✔ workflows    1.1.3
+✔ parsnip      1.1.1     ✔ workflowsets 1.0.1
+✔ purrr        1.0.2     ✔ yardstick    1.2.0
+── Conflicts ───────────────────────────────────────── tidymodels_conflicts() ──
+✖ purrr::discard() masks scales::discard()
+✖ dplyr::filter()  masks stats::filter()
+✖ dplyr::lag()     masks stats::lag()
+✖ recipes::step()  masks stats::step()
+• Learn how to get started at https://www.tidymodels.org/start/
+> library(tidyverse)
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ readr     2.1.4
+✔ lubridate 1.9.3     ✔ stringr   1.5.0
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ readr::col_factor() masks scales::col_factor()
+✖ purrr::discard()    masks scales::discard()
+✖ dplyr::filter()     masks stats::filter()
+✖ stringr::fixed()    masks recipes::fixed()
+✖ dplyr::lag()        masks stats::lag()
+✖ readr::spec()       masks yardstick::spec()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+> library(vroom) 
+
+Attaching package: ‘vroom’
+
+The following objects are masked from ‘package:readr’:
+
+    as.col_spec, col_character, col_date, col_datetime, col_double,
+    col_factor, col_guess, col_integer, col_logical, col_number,
+    col_skip, col_time, cols, cols_condense, cols_only, date_names,
+    date_names_lang, date_names_langs, default_locale, fwf_cols,
+    fwf_empty, fwf_positions, fwf_widths, locale, output_column,
+    problems, spec
+
+The following object is masked from ‘package:yardstick’:
+
+    spec
+
+The following object is masked from ‘package:scales’:
+
+    col_factor
+
+> library(glmnet)
+Loading required package: Matrix
+
+Attaching package: ‘Matrix’
+
+The following objects are masked from ‘package:tidyr’:
+
+    expand, pack, unpack
+
+Loaded glmnet 4.1-8
+> library(randomForest)
+randomForest 4.7-1.1
+Type rfNews() to see new features/changes/bug fixes.
+
+Attaching package: ‘randomForest’
+
+The following object is masked from ‘package:ggplot2’:
+
+    margin
+
+The following object is masked from ‘package:dplyr’:
+
+    combine
+
+> library(doParallel)
+Loading required package: foreach
+
+Attaching package: ‘foreach’
+
+The following objects are masked from ‘package:purrr’:
+
+    accumulate, when
+
+Loading required package: iterators
+Loading required package: parallel
+> library(xgboost)
+
+Attaching package: ‘xgboost’
+
+The following object is masked from ‘package:dplyr’:
+
+    slice
+
+> tidymodels_prefer()
+> conflicted::conflicts_prefer(yardstick::rmse)
+[conflicted] Will prefer yardstick::rmse over any other package.
+> library(rpart)
+> library(stacks)
+> library(embed)
+> 
+> 
+> ####################
+> ##WORK IN PARALLEL##
+> ####################
+> 
+> all_cores <- parallel::detectCores(logical = FALSE)
+> #num_cores <- makePSOCKcluster(NUMBER OF CORES)
+> registerDoParallel(cores = all_cores)
+> 
+> #stopCluster(num_cores)
+> 
+> ########
+> ##DATA##
+> ########
+> 
+> my_data <- vroom("train.csv")
+Rows: 32769 Columns: 10
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+dbl (10): ACTION, RESOURCE, MGR_ID, ROLE_ROLLUP_1, ROLE_ROLLUP_2, ROLE_DEPTN...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> test_data <- vroom("test.csv")
+Rows: 58921 Columns: 10
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+dbl (10): id, RESOURCE, MGR_ID, ROLE_ROLLUP_1, ROLE_ROLLUP_2, ROLE_DEPTNAME,...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> my_data$ACTION <- as.factor(my_data$ACTION)
+> 
+> #######
+> ##EDA##
+> #######
+> 
+> #DataExplorer::plot_histogram(my_data)
+> #GGally::ggpairs(my_data)
+> 
+> #plot_1 <- ggplot(data=my_data) +
+> #  geom_mosaic(aes(x=product(RESOURCE), fill = ACTION))
+> 
+> ##########
+> ##RECIPE##
+> ##########
+> 
+> my_recipe <- recipe(ACTION~., data=my_data) %>%
++ step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors5
++   step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value6
++   #step_dummy(all_nominal_predictors()) %>% 
++   step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION))
+> 
+> prepped_recipe <- prep(my_recipe, verbose = T)
+oper 1 step mutate at [training] 
+oper 2 step other [training] 
+oper 3 step lencode mixed [training] 
+The retained training set is ~ 2.38 Mb  in memory.
+
+> bake_1 <- bake(prepped_recipe, new_data = NULL)
+> 
+> 
+> #######################
+> ##LOGISTIC REGRESSION##
+> #######################
+> 
+> my_data$ACTION <- as.factor(my_data$ACTION)
+> 
+> logistic_mod <- logistic_reg() %>% 
++   set_engine("glm")
+> 
+> logistic_workflow <- workflow() %>%
++ add_recipe(my_recipe) %>%
++ add_model(logistic_mod) %>%
++ fit(data = my_data)
+> 
+> extract_fit_engine(logistic_workflow) %>% #Extracts model details from workflow
++   summary()
+
+Call:
+stats::glm(formula = ..y ~ ., family = stats::binomial, data = data)
+
+Coefficients:
+                   Estimate Std. Error z value Pr(>|z|)    
+(Intercept)      -6.862e+00  2.447e-01 -28.041  < 2e-16 ***
+RESOURCE         -8.454e-01  5.067e-02 -16.685  < 2e-16 ***
+MGR_ID           -8.094e-01  4.879e-02 -16.587  < 2e-16 ***
+ROLE_ROLLUP_1     1.542e-02  7.796e-02   0.198    0.843    
+ROLE_ROLLUP_2    -3.793e-01  7.022e-02  -5.402 6.61e-08 ***
+ROLE_DEPTNAME    -7.431e-01  3.622e-02 -20.518  < 2e-16 ***
+ROLE_TITLE        1.768e+05  3.909e+04   4.522 6.12e-06 ***
+ROLE_FAMILY_DESC -6.120e-01  4.683e-02 -13.070  < 2e-16 ***
+ROLE_FAMILY       4.325e-01  6.571e-02   6.581 4.66e-11 ***
+ROLE_CODE        -1.768e+05  3.909e+04  -4.522 6.12e-06 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 14492  on 32768  degrees of freedom
+Residual deviance: 11664  on 32759  degrees of freedom
+AIC: 11684
+
+Number of Fisher Scoring iterations: 7
+
+> 
+> logistic_predictions <- predict(logistic_workflow,
++                               new_data=test_data,
++                               type= "prob")
+> logistic_predictions <- cbind(test_data$id,logistic_predictions$.pred_1)
+> 
+> colnames(logistic_predictions) <- c("id","ACTION")
+> summary(logistic_predictions)
+       id            ACTION      
+ Min.   :    1   Min.   :0.1223  
+ 1st Qu.:14731   1st Qu.:0.9327  
+ Median :29461   Median :0.9696  
+ Mean   :29461   Mean   :0.9414  
+ 3rd Qu.:44191   3rd Qu.:0.9883  
+ Max.   :58921   Max.   :0.9999  
+> 
+> logistic_predictions <- as.data.frame(logistic_predictions)
+> 
+> #vroom_write(logistic_predictions,"logistic_predictions.csv",',')
+> 
+> #######################
+> ##PENALIZED LOGISTIC##
+> ######################
+> 
+> plog_mod <- logistic_reg(mixture = tune(),
++                          penalty = tune()) %>% 
++   set_engine("glmnet")
+> 
+> plog_workflow <- workflow() %>%
++   add_recipe(my_recipe) %>%
++   add_model(plog_mod)
+> 
+> tuning_grid <- grid_regular(penalty(),
++                            mixture(),
++                            levels = 5) ## L^2 total tuning possibilities13
+> 
+> ## Split data for CV
+> folds <- vfold_cv(my_data, v = 3, repeats=1)
+> 
+> 
+> CV_results <- plog_workflow %>%
++ tune_grid(resamples=folds,
++           grid=tuning_grid,
++           metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
++                              precision, accuracy)) 
