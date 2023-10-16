@@ -85,7 +85,7 @@ summary(logistic_predictions)
 
 logistic_predictions <- as.data.frame(logistic_predictions)
 
-vroom_write(logistic_predictions,"logistic_predictions.csv",',')
+#vroom_write(logistic_predictions,"logistic_predictions.csv",',')
 
 #######################
 ##PENALIZED LOGISTIC##
@@ -131,7 +131,7 @@ colnames(plog_predictions) <- c("id","ACTION")
 
 plog_predictions <- as.data.frame(plog_predictions)
 
-vroom_write(plog_predictions,"plog_predictions.csv",',')
+#vroom_write(plog_predictions,"plog_predictions.csv",',')
 
 #################################
 ##RANDOM FOREST CLASSIFICATIONS##
@@ -176,7 +176,7 @@ colnames(RF_predictions) <- c("id","ACTION")
 
 RF_predictions <- as.data.frame(RF_predictions)
 
-vroom_write(RF_predictions,"RF_predictions.csv",',')
+#vroom_write(RF_predictions,"RF_predictions.csv",',')
 
 
 
