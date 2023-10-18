@@ -14,6 +14,8 @@ conflicted::conflicts_prefer(yardstick::rmse)
 library(rpart)
 library(stacks)
 library(embed)
+library(discrim)
+library(naivebayes)
 
 
 ####################
@@ -178,5 +180,43 @@ RF_predictions <- as.data.frame(RF_predictions)
 
 #vroom_write(RF_predictions,"RF_predictions.csv",',')
 
+###############
+##NAIVE BAYES##
+###############
 
+NB_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+set_mode("classification") %>%
+set_engine("naivebayes") 
+
+NB_workflow <- workflow() %>%
+add_recipe(my_recipe) %>%
+add_model(NB_model)
+
+tuning_grid_NB <- grid_regular(Laplace(),
+                               smoothness(),
+                               levels = 5)
+folds_NB <- vfold_cv(my_data, v = 10, repeats=1)
+
+CV_results_NB <- NB_workflow %>%
+  tune_grid(resamples=folds_NB,
+            grid=tuning_grid_NB,
+            metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
+                               precision, accuracy))
+bestTune_NB <- CV_results_NB %>%
+  select_best("roc_auc")
+
+final_NB_wf <- NB_workflow %>% 
+  finalize_workflow(bestTune_NB) %>% 
+  fit(data = my_data)
+
+NB_predictions <- final_NB_wf %>% 
+predict(NB_workflow, new_data=test_data, type="prob")
+
+NB_predictions <- cbind(test_data$id,NB_predictions$.pred_1)
+
+colnames(NB_predictions) <- c("id","ACTION")
+
+NB_predictions <- as.data.frame(NB_predictions)
+
+vroom_write(NB_predictions,"NB_predictions.csv",',')
 
