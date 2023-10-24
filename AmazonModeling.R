@@ -16,6 +16,7 @@ library(stacks)
 library(embed)
 library(discrim)
 library(naivebayes)
+library(kknn)
 
 
 ####################
@@ -52,9 +53,12 @@ my_data$ACTION <- as.factor(my_data$ACTION)
 
 my_recipe <- recipe(ACTION~., data=my_data) %>%
 step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors5
-  step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value6
+ # combines categorical values that occur <5% into an "other" value6
   #step_dummy(all_nominal_predictors()) %>% 
-  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION))
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_pca(all_predictors(), threshold = .95)
+
 
 prepped_recipe <- prep(my_recipe, verbose = T)
 bake_1 <- bake(prepped_recipe, new_data = NULL)
@@ -178,7 +182,7 @@ colnames(RF_predictions) <- c("id","ACTION")
 
 RF_predictions <- as.data.frame(RF_predictions)
 
-#vroom_write(RF_predictions,"RF_predictions.csv",',')
+vroom_write(RF_predictions,"RF_predictions_pca.csv",',')
 
 ###############
 ##NAIVE BAYES##
@@ -218,5 +222,55 @@ colnames(NB_predictions) <- c("id","ACTION")
 
 NB_predictions <- as.data.frame(NB_predictions)
 
-vroom_write(NB_predictions,"NB_predictions.csv",',')
+vroom_write(NB_predictions,"NB_predictions_pca.csv",',')
+
+#######
+##KNN##
+#######
+
+knn_model <- nearest_neighbor(neighbors= tune()) %>% 
+  set_mode("classification") %>%
+set_engine("kknn")
+
+knn_wf <- workflow() %>%
+add_recipe(my_recipe) %>%
+add_model(knn_model)
+
+tuning_grid_knn <- grid_regular(neighbors(),
+                               levels = 5)
+folds_knn <- vfold_cv(my_data, v = 10, repeats=1)
+
+CV_results_knn <- knn_wf %>%
+  tune_grid(resamples=folds_knn,
+            grid=tuning_grid_knn,
+            metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
+                               precision, accuracy))
+bestTune_knn <- CV_results_knn %>%
+  select_best("roc_auc")
+
+final_knn_wf <- knn_wf %>% 
+  finalize_workflow(bestTune_knn) %>% 
+  fit(data = my_data)
+
+knn_predictions <- final_knn_wf %>% 
+  predict(knn_wf, new_data=test_data, type="prob")
+
+knn_predictions <- cbind(test_data$id,knn_predictions$.pred_1)
+
+colnames(knn_predictions) <- c("id","ACTION")
+
+knn_predictions <- as.data.frame(knn_predictions)
+
+vroom_write(knn_predictions,"knn_predictions_pca.csv",',')
+
+
+
+
+
+
+
+
+
+
+
 
