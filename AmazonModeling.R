@@ -17,15 +17,16 @@ library(embed)
 library(discrim)
 library(naivebayes)
 library(kknn)
+library(themis)
 
 
 ####################
 ##WORK IN PARALLEL##
 ####################
 
-all_cores <- parallel::detectCores(logical = FALSE)
+#all_cores <- parallel::detectCores(logical = FALSE)
 #num_cores <- makePSOCKcluster(NUMBER OF CORES)
-registerDoParallel(cores = all_cores)
+#registerDoParallel(cores = all_cores)
 
 #stopCluster(num_cores)
 
@@ -57,7 +58,8 @@ step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric fea
   #step_dummy(all_nominal_predictors()) %>% 
   step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>% 
   step_normalize(all_numeric_predictors()) %>% 
-  step_pca(all_predictors(), threshold = .95)
+  step_pca(all_predictors(), threshold = .95) %>% 
+  step_smote(all_outcomes(), neighbors=7)
 
 
 prepped_recipe <- prep(my_recipe, verbose = T)
@@ -91,7 +93,7 @@ summary(logistic_predictions)
 
 logistic_predictions <- as.data.frame(logistic_predictions)
 
-#vroom_write(logistic_predictions,"logistic_predictions.csv",',')
+vroom_write(logistic_predictions,"logistic_predictions_smote.csv",',')
 
 #######################
 ##PENALIZED LOGISTIC##
@@ -137,7 +139,7 @@ colnames(plog_predictions) <- c("id","ACTION")
 
 plog_predictions <- as.data.frame(plog_predictions)
 
-#vroom_write(plog_predictions,"plog_predictions.csv",',')
+vroom_write(plog_predictions,"plog_predictions_smote.csv",',')
 
 #################################
 ##RANDOM FOREST CLASSIFICATIONS##
@@ -145,7 +147,7 @@ plog_predictions <- as.data.frame(plog_predictions)
 
 RF_model <- rand_forest(mode = "classification",
                         mtry = tune(),
-                        trees = 500,
+                        trees = 750,
                         min_n = tune()) %>% #Applies Linear Model
   set_engine("ranger")
 
@@ -155,8 +157,8 @@ RF_workflow <- workflow() %>% #Creates a workflow
 
 tuning_grid_rf <- grid_regular(mtry(range = c(1,10)),
                                min_n(),
-                               levels = 5)
-folds_rf <- vfold_cv(my_data, v = 10, repeats=1)
+                               levels = 10)
+folds_rf <- vfold_cv(my_data, v = 20, repeats=1)
 
 CV_results_rf <- RF_workflow %>%
   tune_grid(resamples=folds_rf,
@@ -182,7 +184,7 @@ colnames(RF_predictions) <- c("id","ACTION")
 
 RF_predictions <- as.data.frame(RF_predictions)
 
-vroom_write(RF_predictions,"RF_predictions_pca.csv",',')
+vroom_write(RF_predictions,"RF_predictions_pca_smote.csv",',')
 
 ###############
 ##NAIVE BAYES##
@@ -222,7 +224,7 @@ colnames(NB_predictions) <- c("id","ACTION")
 
 NB_predictions <- as.data.frame(NB_predictions)
 
-vroom_write(NB_predictions,"NB_predictions_pca.csv",',')
+vroom_write(NB_predictions,"NB_predictions_pca_smote.csv",',')
 
 #######
 ##KNN##
@@ -261,10 +263,47 @@ colnames(knn_predictions) <- c("id","ACTION")
 
 knn_predictions <- as.data.frame(knn_predictions)
 
-vroom_write(knn_predictions,"knn_predictions_pca.csv",',')
+vroom_write(knn_predictions,"knn_predictions_pca_smote.csv",',')
 
+#######
+##SVM##
+#######
 
+svm_model <-svm_rbf(rbf_sigma=tune(), cost=tune()) %>% 
+  set_mode("classification") %>%
+  set_engine("kernlab")
 
+svm_wf <- workflow() %>%
+  add_recipe(my_recipe) %>%
+  add_model(svm_model)
+
+tuning_grid_svm <- grid_regular(rbf_sigma(),
+                                cost(),
+                                levels = 5)
+folds_svm <- vfold_cv(my_data, v = 10, repeats=1)
+
+CV_results_svm <- svm_wf %>%
+  tune_grid(resamples=folds_svm,
+            grid=tuning_grid_svm,
+            metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
+                               precision, accuracy))
+bestTune_svm <- CV_results_svm %>%
+  select_best("roc_auc")
+
+final_svm_wf <- svm_wf %>% 
+  finalize_workflow(bestTune_svm) %>% 
+  fit(data = my_data)
+
+svm_predictions <- final_svm_wf %>% 
+  predict(svm_wf, new_data=test_data, type="prob")
+
+svm_predictions <- cbind(test_data$id,svm_predictions$.pred_1)
+
+colnames(svm_predictions) <- c("id","ACTION")
+
+svm_predictions <- as.data.frame(svm_predictions)
+
+vroom_write(svm_predictions,"svm_predictions_pca_smote.csv",',')
 
 
 
