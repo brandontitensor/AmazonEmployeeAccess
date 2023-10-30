@@ -66,80 +66,80 @@ prepped_recipe <- prep(my_recipe, verbose = T)
 bake_1 <- bake(prepped_recipe, new_data = NULL)
 
 
-#######################
-##LOGISTIC REGRESSION##
-#######################
-
-my_data$ACTION <- as.factor(my_data$ACTION)
-
-logistic_mod <- logistic_reg() %>% 
-  set_engine("glm")
-
-logistic_workflow <- workflow() %>%
-add_recipe(my_recipe) %>%
-add_model(logistic_mod) %>%
-fit(data = my_data)
-
-extract_fit_engine(logistic_workflow) %>% #Extracts model details from workflow
-  summary()
-
-logistic_predictions <- predict(logistic_workflow,
-                              new_data=test_data,
-                              type= "prob")
-logistic_predictions <- cbind(test_data$id,logistic_predictions$.pred_1)
-
-colnames(logistic_predictions) <- c("id","ACTION")
-summary(logistic_predictions)
-
-logistic_predictions <- as.data.frame(logistic_predictions)
-
-vroom_write(logistic_predictions,"logistic_predictions_smote.csv",',')
-
-#######################
-##PENALIZED LOGISTIC##
-######################
-
-plog_mod <- logistic_reg(mixture = tune(),
-                         penalty = tune()) %>% 
-  set_engine("glmnet")
-
-plog_workflow <- workflow() %>%
-  add_recipe(my_recipe) %>%
-  add_model(plog_mod)
-
-tuning_grid <- grid_regular(penalty(),
-                           mixture(),
-                           levels = 5) ## L^2 total tuning possibilities13
-
-## Split data for CV
-folds <- vfold_cv(my_data, v = 3, repeats=1)
-
-
-CV_results <- plog_workflow %>%
-tune_grid(resamples=folds,
-          grid=tuning_grid,
-          metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
-                             precision, accuracy)) 
-bestTune <- CV_results %>%
-select_best("roc_auc")
-
-final_plog_workflow <-
-plog_workflow %>%
-finalize_workflow(bestTune) %>%
-fit(data=my_data)
-
-## Predict
-plog_predictions <- final_plog_workflow %>%
-predict(new_data = test_data, type="prob")
-
-plog_predictions <- cbind(test_data$id,plog_predictions$.pred_1)
-
-colnames(plog_predictions) <- c("id","ACTION")
-
-
-plog_predictions <- as.data.frame(plog_predictions)
-
-vroom_write(plog_predictions,"plog_predictions_smote.csv",',')
+# #######################
+# ##LOGISTIC REGRESSION##
+# #######################
+# 
+# my_data$ACTION <- as.factor(my_data$ACTION)
+# 
+# logistic_mod <- logistic_reg() %>%
+#   set_engine("glm")
+# 
+# logistic_workflow <- workflow() %>%
+# add_recipe(my_recipe) %>%
+# add_model(logistic_mod) %>%
+# fit(data = my_data)
+# 
+# extract_fit_engine(logistic_workflow) %>% #Extracts model details from workflow
+#   summary()
+# 
+# logistic_predictions <- predict(logistic_workflow,
+#                               new_data=test_data,
+#                               type= "prob")
+# logistic_predictions <- cbind(test_data$id,logistic_predictions$.pred_1)
+# 
+# colnames(logistic_predictions) <- c("id","ACTION")
+# summary(logistic_predictions)
+# 
+# logistic_predictions <- as.data.frame(logistic_predictions)
+# 
+# vroom_write(logistic_predictions,"logistic_predictions_smote.csv",',')
+# 
+# #######################
+# ##PENALIZED LOGISTIC##
+# ######################
+# 
+# plog_mod <- logistic_reg(mixture = tune(),
+#                          penalty = tune()) %>%
+#   set_engine("glmnet")
+# 
+# plog_workflow <- workflow() %>%
+#   add_recipe(my_recipe) %>%
+#   add_model(plog_mod)
+# 
+# tuning_grid <- grid_regular(penalty(),
+#                            mixture(),
+#                            levels = 5) ## L^2 total tuning possibilities13
+# 
+# ## Split data for CV
+# folds <- vfold_cv(my_data, v = 3, repeats=1)
+# 
+# 
+# CV_results <- plog_workflow %>%
+# tune_grid(resamples=folds,
+#           grid=tuning_grid,
+#           metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
+#                              precision, accuracy))
+# bestTune <- CV_results %>%
+# select_best("roc_auc")
+# 
+# final_plog_workflow <-
+# plog_workflow %>%
+# finalize_workflow(bestTune) %>%
+# fit(data=my_data)
+# 
+# ## Predict
+# plog_predictions <- final_plog_workflow %>%
+# predict(new_data = test_data, type="prob")
+# 
+# plog_predictions <- cbind(test_data$id,plog_predictions$.pred_1)
+# 
+# colnames(plog_predictions) <- c("id","ACTION")
+# 
+# 
+# plog_predictions <- as.data.frame(plog_predictions)
+# 
+# vroom_write(plog_predictions,"plog_predictions_smote.csv",',')
 
 #################################
 ##RANDOM FOREST CLASSIFICATIONS##
@@ -157,8 +157,8 @@ RF_workflow <- workflow() %>% #Creates a workflow
 
 tuning_grid_rf <- grid_regular(mtry(range = c(1,10)),
                                min_n(),
-                               levels = 10)
-folds_rf <- vfold_cv(my_data, v = 20, repeats=1)
+                               levels = 5)
+folds_rf <- vfold_cv(my_data, v = 3, repeats=1)
 
 CV_results_rf <- RF_workflow %>%
   tune_grid(resamples=folds_rf,
