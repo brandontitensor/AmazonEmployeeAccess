@@ -24,9 +24,9 @@ library(themis)
 ##WORK IN PARALLEL##
 ####################
 
-#all_cores <- parallel::detectCores(logical = FALSE)
+all_cores <- parallel::detectCores(logical = FALSE)
 #num_cores <- makePSOCKcluster(NUMBER OF CORES)
-#registerDoParallel(cores = all_cores)
+registerDoParallel(cores = all_cores)
 
 #stopCluster(num_cores)
 
@@ -54,11 +54,10 @@ my_data$ACTION <- as.factor(my_data$ACTION)
 
 my_recipe <- recipe(ACTION~., data=my_data) %>%
 step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors5
- # combines categorical values that occur <5% into an "other" value6
+ # step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value6
   #step_dummy(all_nominal_predictors()) %>% 
   step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>% 
   step_normalize(all_numeric_predictors()) %>% 
-  step_pca(all_predictors(), threshold = .95) %>% 
   step_smote(all_outcomes(), neighbors=7)
 
 
@@ -147,7 +146,7 @@ bake_1 <- bake(prepped_recipe, new_data = NULL)
 
 RF_model <- rand_forest(mode = "classification",
                         mtry = tune(),
-                        trees = 750,
+                        trees = 1000,
                         min_n = tune()) %>% #Applies Linear Model
   set_engine("ranger")
 
@@ -158,7 +157,7 @@ RF_workflow <- workflow() %>% #Creates a workflow
 tuning_grid_rf <- grid_regular(mtry(range = c(1,10)),
                                min_n(),
                                levels = 5)
-folds_rf <- vfold_cv(my_data, v = 3, repeats=1)
+folds_rf <- vfold_cv(my_data, v = 10, repeats=1)
 
 CV_results_rf <- RF_workflow %>%
   tune_grid(resamples=folds_rf,
@@ -184,7 +183,7 @@ colnames(RF_predictions) <- c("id","ACTION")
 
 RF_predictions <- as.data.frame(RF_predictions)
 
-vroom_write(RF_predictions,"RF_predictions_pca_smote.csv",',')
+vroom_write(RF_predictions,"RF_predictions_pca_smote1.csv",',')
 
 ###############
 ##NAIVE BAYES##
@@ -287,6 +286,7 @@ CV_results_svm <- svm_wf %>%
             grid=tuning_grid_svm,
             metrics=metric_set(roc_auc, f_meas, sens, recall, spec,
                                precision, accuracy))
+
 bestTune_svm <- CV_results_svm %>%
   select_best("roc_auc")
 
